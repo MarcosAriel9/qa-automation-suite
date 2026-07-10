@@ -1,0 +1,19 @@
+{
+  "name": "qa-automation-suite",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Validacion funcional automatizada post-despliegue para POS y Admin",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "postinstall": "playwright install chromium"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "playwright": "^1.47.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

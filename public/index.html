@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Validación funcional — POS / Admin</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <main class="container">
+    <h1>Validación funcional post-despliegue</h1>
+    <p class="subtitle">Selecciona la plataforma, el ambiente y los fronts a validar. El navegador se abrirá visible para que puedas escanear el QR de pago cuando se requiera.</p>
+
+    <form id="run-form">
+      <fieldset>
+        <legend>Plataforma</legend>
+        <label><input type="radio" name="platform" value="pos" checked> POS</label>
+        <label><input type="radio" name="platform" value="admin"> Admin</label>
+      </fieldset>
+
+      <fieldset>
+        <legend>Ambiente</legend>
+        <label><input type="radio" name="environment" value="dev" checked> Dev</label>
+        <label><input type="radio" name="environment" value="prod"> Producción</label>
+      </fieldset>
+
+      <fieldset>
+        <legend>Fronts a validar</legend>
+        <div id="fronts-list" class="fronts-list"></div>
+      </fieldset>
+
+      <div id="prod-venta-warning" class="warning hidden">
+        <p><strong>⚠ Vas a generar un cobro real en Producción.</strong> El front "Venta" genera un QR de pago real; al escanearlo con la app del banco se moverá dinero real.</p>
+        <label><input type="checkbox" id="confirm-venta-prod"> Entiendo que esto genera un cobro real y quiero continuar</label>
+      </div>
+
+      <div class="run-controls">
+        <button type="submit" id="start-button">Iniciar validación</button>
+        <button type="button" id="cancel-button" class="cancel-button hidden">Cancelar corrida</button>
+      </div>
+    </form>
+
+    <section id="progress" class="progress hidden">
+      <h2>Progreso</h2>
+      <ol id="progress-log" class="progress-log"></ol>
+      <div id="run-result" class="run-result"></div>
+    </section>
+
+    <section class="history">
+      <h2>Corridas anteriores</h2>
+      <div id="history-list" class="history-list">Cargando…</div>
+    </section>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
