@@ -13,7 +13,13 @@ async function capturarMontoConReintentos(page, monto, { shot, log, timeouts }) 
     if (attempt > 1) {
       await page.reload({ waitUntil: 'domcontentloaded' });
       const expandButton = page.locator('[data-testid="button-expand"]');
-      if (await expandButton.isVisible({ timeout: 5000 }).catch(() => false)) {
+      // OJO: isVisible({timeout}) esta deprecado y el timeout se IGNORA (chequeo instantaneo);
+      // waitFor es la unica forma real de esperar.
+      const hasExpand = await expandButton
+        .waitFor({ state: 'visible', timeout: 5000 })
+        .then(() => true)
+        .catch(() => false);
+      if (hasExpand) {
         await expandButton.click();
       }
     }
@@ -57,7 +63,11 @@ module.exports = {
 
     // El selector de Sucursal/Caja solo aparece si la sesion no tiene ya una caja asociada.
     const sucursalDropdown = page.getByText('Selección de sucursal', { exact: false });
-    if (await sucursalDropdown.isVisible({ timeout: 5000 }).catch(() => false)) {
+    const hasSucursalDialog = await sucursalDropdown
+      .waitFor({ state: 'visible', timeout: 5000 })
+      .then(() => true)
+      .catch(() => false);
+    if (hasSucursalDialog) {
       await sucursalDropdown.click();
       await page.getByText(cfg.sucursal, { exact: false }).click();
       await page.getByText('Selección de caja', { exact: false }).click();
@@ -70,7 +80,11 @@ module.exports = {
     // Puede haber quedado un producto de un flujo anterior en el carrito (persiste en la
     // sesion del backend, no se limpia solo); se borra para partir de un estado limpio.
     const borrarTodo = page.getByRole('button', { name: 'Borrar todo', exact: true });
-    if (await borrarTodo.isVisible({ timeout: 3000 }).catch(() => false)) {
+    const hasBorrarTodo = await borrarTodo
+      .waitFor({ state: 'visible', timeout: 3000 })
+      .then(() => true)
+      .catch(() => false);
+    if (hasBorrarTodo) {
       await borrarTodo.click();
       await log('Limpiar carrito con productos de un flujo anterior', 'ok');
     }
@@ -79,7 +93,11 @@ module.exports = {
     // expandida por defecto (depende de la configuracion del comercio); el click de expandir
     // es opcional, solo se hace si el boton existe.
     const expandButton = page.locator('[data-testid="button-expand"]');
-    if (await expandButton.isVisible({ timeout: 5000 }).catch(() => false)) {
+    const hasExpandButton = await expandButton
+      .waitFor({ state: 'visible', timeout: 5000 })
+      .then(() => true)
+      .catch(() => false);
+    if (hasExpandButton) {
       await expandButton.click();
     }
 

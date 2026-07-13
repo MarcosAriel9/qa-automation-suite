@@ -37,6 +37,10 @@ module.exports = {
       successUrlPattern: (url) => url.pathname === '/',
       timeout: timeouts.default,
     });
+    // La URL cambia antes de que el shell termine de montar el sidebar/dashboard; se da un
+    // margen para no capturar una pantalla en blanco justo tras la navegación.
+    await page.waitForLoadState('networkidle', { timeout: timeouts.default }).catch(() => {});
+    await page.waitForTimeout(1500);
     const shotOk = await shot('login-exitoso-dashboard');
     await log('Iniciar sesión', 'ok', 'Redirigido al dashboard', shotOk);
   },

@@ -19,8 +19,14 @@ module.exports = {
 
     // El selector de Sucursal/Caja solo aparece si la sesion no tiene ya una caja asociada
     // (mismo comportamiento que en Venta).
+    // OJO: locator.isVisible({timeout}) esta deprecado y el timeout se IGNORA (Playwright
+    // devuelve el estado actual al instante); usar waitFor es la unica forma real de esperar.
     const sucursalDropdown = page.getByText('Selección de sucursal', { exact: false });
-    if (await sucursalDropdown.isVisible({ timeout: 5000 }).catch(() => false)) {
+    const hasSucursalDialog = await sucursalDropdown
+      .waitFor({ state: 'visible', timeout: 5000 })
+      .then(() => true)
+      .catch(() => false);
+    if (hasSucursalDialog) {
       await sucursalDropdown.click();
       await page.getByText(cfg.sucursal, { exact: false }).click();
       await page.getByText('Selección de caja', { exact: false }).click();
@@ -48,7 +54,12 @@ module.exports = {
     // no se interactua con ella. Solo se revisa "Estatus de solicitudes" (solo lectura),
     // que puede no existir segun un feature flag del ambiente.
     const statusTab = page.getByRole('tab', { name: /Estatus de solicitudes/i });
-    const hasStatusTab = await statusTab.isVisible().catch(() => false);
+    // isVisible() no espera nada: si el tab depende de un GET con feature flag que aun no
+    // resuelve, da un falso negativo y reporta "no habilitado" cuando en realidad solo tardo.
+    const hasStatusTab = await statusTab
+      .waitFor({ state: 'visible', timeout: 8000 })
+      .then(() => true)
+      .catch(() => false);
     if (!hasStatusTab) {
       const shotFile = await shot('originacion-sin-tab-estatus');
       await log(
