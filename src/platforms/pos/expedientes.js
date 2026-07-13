@@ -9,6 +9,10 @@ module.exports = {
     await page.locator('[data-testid="link-test-Expedientes"]').click();
     await page.waitForURL(/\/expedientes/, { timeout: timeouts.default });
     await page.locator('[data-testid="formularioExpediente"]').waitFor({ state: 'visible', timeout: timeouts.default });
+    // El formulario aparece en el DOM antes de que sus selects/combos terminen de poblarse
+    // via llamadas asincronas; se da un margen para no capturar la pantalla a medio cargar.
+    await page.waitForLoadState('networkidle', { timeout: timeouts.default }).catch(() => {});
+    await page.waitForTimeout(1500);
     const shotFormulario = await shot('expedientes-formulario-cargado');
     await log('Cargar módulo de Expedientes', 'ok', null, shotFormulario);
 

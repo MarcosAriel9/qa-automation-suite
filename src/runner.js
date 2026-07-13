@@ -50,6 +50,24 @@ async function isAppCrashed(page) {
 }
 
 /**
+ * Agrupa errores de consola identicos (un mismo warning/error suele repetirse decenas de
+ * veces, ej. en un polling) en una sola entrada con contador, para que el reporte sea legible
+ * en vez de una pared de lineas duplicadas.
+ */
+function groupConsoleErrors(errors) {
+  const byText = new Map();
+  for (const err of errors) {
+    const existing = byText.get(err.text);
+    if (existing) {
+      existing.count += 1;
+    } else {
+      byText.set(err.text, { text: err.text, location: err.location, count: 1, firstTs: err.ts });
+    }
+  }
+  return [...byText.values()];
+}
+
+/**
  * Vuelve a Inicio entre reintentos de un front. Se prefiere un click en el link del sidebar
  * (navegacion SPA de React Router) sobre `page.goto`/reload: este ultimo fuerza al shell a
  * reinicializar TODOS los remotes de Module Federation desde cero, lo cual a veces se queda en
@@ -135,6 +153,23 @@ async function runValidation(
   const context = await browser.newContext({ viewport: { width: 1920, height: 1080 } });
   const page = await context.newPage();
 
+  // Se capturan los errores de consola/excepciones no atrapadas del navegador (no los propios
+  // logs de Playwright) para incluirlos como evidencia: ayudan a diagnosticar la causa real de
+  // un front roto (ej. un chunk de Module Federation faltante) sin tener que reproducirlo a mano.
+  const consoleErrors = [];
+  page.on('console', (msg) => {
+    if (msg.type() !== 'error') return;
+    const loc = msg.location();
+    consoleErrors.push({
+      ts: Date.now(),
+      text: msg.text(),
+      location: loc && loc.url ? `${loc.url}:${loc.lineNumber}` : null,
+    });
+  });
+  page.on('pageerror', (err) => {
+    consoleErrors.push({ ts: Date.now(), text: err.message, location: null });
+  });
+
   const results = [];
   let overallStatus = 'ok';
   let wasCancelled = false;
@@ -146,6 +181,7 @@ async function runValidation(
     }
 
     const frontStart = Date.now();
+    const consoleErrorsStartIndex = consoleErrors.length;
     emit({ type: 'front-start', frontId: front.id, label: front.label });
 
     const log = async (step, status, detail = null, screenshotFile = null) => {
@@ -196,6 +232,21 @@ async function runValidation(
       }
     }
 
+    const frontConsoleErrors = groupConsoleErrors(consoleErrors.slice(consoleErrorsStartIndex));
+    for (const consoleErr of frontConsoleErrors) {
+      const entry = {
+        front: front.label,
+        frontId: front.id,
+        step: `Error de consola${consoleErr.count > 1 ? ` (x${consoleErr.count})` : ''}: ${consoleErr.text}`,
+        status: 'console-error',
+        detail: consoleErr.location,
+        screenshot: null,
+        ts: consoleErr.firstTs,
+      };
+      steps.push(entry);
+      emit({ type: 'log', entry });
+    }
+
     if (isCancelled() && !succeeded) {
       wasCancelled = true;
       results.push({ id: front.id, label: front.label, status: 'cancelled', durationMs: Date.now() - frontStart });
@@ -203,8 +254,10 @@ async function runValidation(
       break;
     }
 
+    const consoleErrorCount = frontConsoleErrors.reduce((sum, e) => sum + e.count, 0);
+
     if (succeeded) {
-      results.push({ id: front.id, label: front.label, status: 'ok', durationMs: Date.now() - frontStart });
+      results.push({ id: front.id, label: front.label, status: 'ok', durationMs: Date.now() - frontStart, consoleErrorCount });
       emit({ type: 'front-done', frontId: front.id, status: 'ok' });
     } else {
       let errorShot = null;
@@ -229,6 +282,7 @@ async function runValidation(
         status: 'failed',
         durationMs: Date.now() - frontStart,
         error: lastError.message,
+        consoleErrorCount,
       });
       overallStatus = 'failed';
       // No se detiene el flujo: se continua con el siguiente front aunque uno falle tras

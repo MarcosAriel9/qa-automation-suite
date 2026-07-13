@@ -15,6 +15,7 @@ module.exports = {
     // producto", "Editar producto" ni el switch de habilitar/inhabilitar (mutan datos reales).
     await selectFirstMuiOption(page, '[data-testid="select-comercio"]', timeouts.default);
     await page.waitForLoadState('networkidle', { timeout: timeouts.default }).catch(() => {});
+    await page.waitForTimeout(1500);
 
     const shotLista = await shot('plataforma-productos-lista-cargada');
     await log('Cargar lista de Productos (Plataforma CDT)', 'ok', null, shotLista);

@@ -33,6 +33,7 @@ module.exports = {
 
     await tab.click();
     await page.waitForLoadState('networkidle', { timeout: timeouts.default }).catch(() => {});
+    await page.waitForTimeout(1500);
 
     const shotFile = await shot('plataforma-geografia-consulta-personal');
     await log('Cargar "Consulta de personal" (Geografía, Plataforma CDT)', 'ok', null, shotFile);
@@ -49,6 +50,7 @@ module.exports = {
       await searchInput.fill('a');
       await page.locator('button[title="buscar"]').click();
       await page.waitForLoadState('networkidle', { timeout: timeouts.default }).catch(() => {});
+      await page.waitForTimeout(1500);
       const shotBusqueda = await shot('plataforma-geografia-personal-busqueda');
       await log('Buscar personal por texto', 'ok', null, shotBusqueda);
     }

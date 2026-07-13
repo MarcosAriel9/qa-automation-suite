@@ -17,6 +17,7 @@ module.exports = {
     const listado = page.locator('[data-testid="listado-cdt-originacion"]');
     await listado.waitFor({ state: 'visible', timeout: timeouts.default });
     await page.waitForLoadState('networkidle', { timeout: timeouts.default }).catch(() => {});
+    await page.waitForTimeout(1500);
 
     const shotFile = await shot('plataforma-originacion-cargado');
     await log('Cargar dashboard de Originación (Plataforma CDT)', 'ok', null, shotFile);
@@ -39,6 +40,7 @@ module.exports = {
       if (opened) {
         await option.click();
         await page.waitForLoadState('networkidle', { timeout: timeouts.default }).catch(() => {});
+        await page.waitForTimeout(1500);
         const shotFiltro = await shot('plataforma-originacion-filtro-socio');
         await log('Filtrar solicitudes por Socio comercial', 'ok', null, shotFiltro);
       }

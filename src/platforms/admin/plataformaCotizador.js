@@ -46,6 +46,7 @@ module.exports = {
     if (opened) {
       await option.click();
       await page.waitForLoadState('networkidle', { timeout: timeouts.default }).catch(() => {});
+      await page.waitForTimeout(1500);
     }
 
     const shotFile = await shot('plataforma-cotizador-cargado');

@@ -18,7 +18,10 @@ module.exports = {
     // via SDK de Google Maps); el unico control real dentro del InfoWindow de un marcador
     // ("#aplicar") ya avanza al paso 2 del wizard, asi que no hay una interaccion adicional
     // de solo lectura posible en esta pantalla.
-    await page.waitForTimeout(5000);
+    // Sin indicador de carga en el DOM, la unica opcion es una espera fija; el mapa (tiles +
+    // marcadores via SDK de Google Maps) puede tardar mas de 5s en redes lentas o en Prod, lo
+    // que dejaba la captura a medias (tiles en gris); se sube el margen para cubrir ese caso.
+    await page.waitForTimeout(8000);
     const shotFile = await shot('plataforma-registro-visitas-mapa-cargado');
     await log('Cargar mapa de Registro de Visitas (Plataforma CDT)', 'ok', null, shotFile);
 

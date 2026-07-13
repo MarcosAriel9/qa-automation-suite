@@ -13,6 +13,8 @@ module.exports = {
 
     const rows = page.locator('table.table tbody tr');
     await rows.first().waitFor({ state: 'visible', timeout: timeouts.default });
+    // La primera fila puede aparecer antes de que el resto de la tabla termine de renderizar.
+    await page.waitForTimeout(1500);
     const shotLista = await shot('usuarios-lista-cargada');
     await log('Cargar lista de Usuarios con datos reales', 'ok', null, shotLista);
 
@@ -20,6 +22,7 @@ module.exports = {
     // solo lectura) para comprobar que la tabla recarga con datos reales distintos.
     await page.getByText('Inhabilitados', { exact: true }).click();
     await page.waitForLoadState('networkidle', { timeout: timeouts.default }).catch(() => {});
+    await page.waitForTimeout(1500);
     const shotTab = await shot('usuarios-tab-inhabilitados');
     await log('Cambiar a la pestaña "Inhabilitados" y recargar la tabla', 'ok', null, shotTab);
   },

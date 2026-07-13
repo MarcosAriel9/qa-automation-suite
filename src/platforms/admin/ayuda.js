@@ -20,7 +20,7 @@ module.exports = {
     await log('Cargar preguntas frecuentes', 'ok', null, shotLista);
 
     await firstQuestion.click();
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(900);
     const shotExpandido = await shot('ayuda-pregunta-expandida');
     await log('Expandir la primera pregunta frecuente', 'ok', null, shotExpandido);
   },

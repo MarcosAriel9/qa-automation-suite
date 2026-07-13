@@ -36,6 +36,9 @@ module.exports = {
     await page
       .getByText('Alta - Comercios baz crédito', { exact: false })
       .waitFor({ state: 'visible', timeout: timeouts.default });
+    // El titulo del wizard aparece antes de que sus pasos/formularios terminen de montarse.
+    await page.waitForLoadState('networkidle', { timeout: timeouts.default }).catch(() => {});
+    await page.waitForTimeout(1500);
     const shotWizard = await shot('autoguardado-wizard-cargado');
     await log(
       'Abrir el wizard de Autoguardado Alta Comercio ("+Autoguardado")',

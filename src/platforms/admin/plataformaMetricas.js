@@ -18,6 +18,7 @@ module.exports = {
     const dashboard = page.locator('[data-testid="test-dashboard-body"]');
     await dashboard.waitFor({ state: 'visible', timeout: timeouts.default });
     await page.waitForLoadState('networkidle', { timeout: timeouts.default }).catch(() => {});
+    await page.waitForTimeout(1500);
 
     const shotFile = await shot('plataforma-metricas-avance-general');
     await log('Cargar "Avance general" (Métricas, Plataforma CDT)', 'ok', null, shotFile);

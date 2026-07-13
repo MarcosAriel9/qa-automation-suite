@@ -21,6 +21,10 @@ module.exports = {
       await assertAppNotCrashed(page);
       throw new Error('El módulo de Capacitación no cargó a tiempo');
     }
+    // El tab-menu aparece antes de que la lista de documentos termine de pintarse; sin este
+    // margen la captura queda a medias (tarjetas vacías o skeleton).
+    await page.waitForLoadState('networkidle', { timeout: timeouts.default }).catch(() => {});
+    await page.waitForTimeout(1500);
     const shotDocumentos = await shot('capacitacion-documentos-cargado');
     await log('Cargar módulo de Capacitación (tab Documentos)', 'ok', null, shotDocumentos);
 

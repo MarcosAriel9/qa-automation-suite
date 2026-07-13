@@ -18,4 +18,9 @@ module.exports = [
   require('./plataformaRegistroVisitas'),
   require('./plataformaOriginacion'),
   require('./plataformaMetricas'),
+  require('./plataformaClasificaciones'),
+  require('./plataformaCompensaciones'),
+  require('./plataformaAutorizacionPrecios'),
+  require('./plataformaSolicitudesVisita'),
+  require('./plataformaBitacorasSurtimiento'),
 ];

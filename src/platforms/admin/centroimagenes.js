@@ -20,6 +20,8 @@ module.exports = {
 
     await firstCard.click();
     await page.waitForLoadState('networkidle', { timeout: timeouts.default }).catch(() => {});
+    // Las miniaturas de imagen suelen seguir cargando (lazy) un momento despues de networkidle.
+    await page.waitForTimeout(1500);
     const shotDispositivos = await shot('centroimagenes-dispositivos-cargado');
     await log('Entrar a la lista de imágenes (Login)', 'ok', null, shotDispositivos);
   },

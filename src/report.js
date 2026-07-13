@@ -7,6 +7,7 @@ const STATUS_LABEL = {
   waiting: 'En espera',
   'waiting-manual': 'Acción manual requerida',
   cancelled: 'Cancelado',
+  'console-error': 'Error de consola',
 };
 
 function escapeHtml(value) {
@@ -27,7 +28,8 @@ function formatDuration(ms) {
 }
 
 function renderStepsTable(frontSteps) {
-  const rows = frontSteps
+  const rows = [...frontSteps]
+    .sort((a, b) => a.ts - b.ts)
     .map((s) => {
       const img = s.screenshot
         ? `<a href="screenshots/${s.screenshot}" target="_blank"><img class="thumb" src="screenshots/${s.screenshot}" alt=""></a>`
@@ -50,7 +52,8 @@ function renderStepsTable(frontSteps) {
 // Vista para PDF: un bloque por paso con la captura a todo el ancho de la pagina, en vez de
 // una miniatura en una celda de tabla, para que la evidencia sea legible al imprimir/exportar.
 function renderStepsBlocks(frontSteps) {
-  return frontSteps
+  return [...frontSteps]
+    .sort((a, b) => a.ts - b.ts)
     .map((s) => {
       const img = s.screenshot ? `<img class="shot-large" src="screenshots/${s.screenshot}" alt="">` : '';
       return `
@@ -75,6 +78,7 @@ function buildSummaryRows(results) {
         <td>${escapeHtml(r.label)}</td>
         <td><span class="badge badge-${r.status}">${STATUS_LABEL[r.status] || r.status}</span></td>
         <td>${formatDuration(r.durationMs)}</td>
+        <td>${r.consoleErrorCount ? `<span class="badge badge-console-error">${r.consoleErrorCount}</span>` : '—'}</td>
         <td>${r.error ? escapeHtml(r.error) : ''}</td>
       </tr>`
     )
@@ -99,12 +103,14 @@ const SHARED_STYLES = `
   .badge-failed { background: #dc2626; color: #fff; }
   .badge-waiting, .badge-waiting-manual { background: #d97706; color: #fff; }
   .badge-cancelled { background: #6b7280; color: #fff; }
+  .badge-console-error { background: #7c3aed; color: #fff; }
   table { border-collapse: collapse; width: 100%; margin-bottom: 1rem; }
   th, td { text-align: left; padding: 0.5rem 0.6rem; border-bottom: 1px solid #e5e5e5; vertical-align: top; }
   th { font-size: 0.8rem; text-transform: uppercase; color: #888; }
   .detail { font-size: 0.85rem; color: #666; margin-top: 0.2rem; }
   .front-section { margin-bottom: 2rem; }
   .row-failed td { background: rgba(220,38,38,0.06); }
+  .row-console-error td { background: rgba(124,58,237,0.06); }
 `;
 
 function generateReport({ dir, meta, steps, results }) {
@@ -151,7 +157,7 @@ function generateReport({ dir, meta, steps, results }) {
   <section>
     <h2>Resumen</h2>
     <table>
-      <thead><tr><th>Front</th><th>Estado</th><th>Duración</th><th>Detalle</th></tr></thead>
+      <thead><tr><th>Front</th><th>Estado</th><th>Duración</th><th>Errores consola</th><th>Detalle</th></tr></thead>
       <tbody>${buildSummaryRows(results)}</tbody>
     </table>
   </section>
@@ -200,7 +206,7 @@ function buildPrintHtml({ meta, steps, results }) {
   <section>
     <h2>Resumen</h2>
     <table>
-      <thead><tr><th>Front</th><th>Estado</th><th>Duración</th><th>Detalle</th></tr></thead>
+      <thead><tr><th>Front</th><th>Estado</th><th>Duración</th><th>Errores consola</th><th>Detalle</th></tr></thead>
       <tbody>${buildSummaryRows(results)}</tbody>
     </table>
   </section>
