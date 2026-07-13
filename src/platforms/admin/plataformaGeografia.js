@@ -37,6 +37,22 @@ module.exports = {
     const shotFile = await shot('plataforma-geografia-consulta-personal');
     await log('Cargar "Consulta de personal" (Geografía, Plataforma CDT)', 'ok', null, shotFile);
 
+    // El buscador de "Consulta de personal" solo dispara un GET con el texto capturado
+    // (services/empleados.ts -> getPersonal), no escribe nada; se usa un texto corto generico
+    // en vez de un valor real de este ambiente, que no se conoce de antemano.
+    const searchInput = page.locator('input[data-testid="input-searchBar"]');
+    const hasSearch = await searchInput
+      .waitFor({ state: 'visible', timeout: 8000 })
+      .then(() => true)
+      .catch(() => false);
+    if (hasSearch) {
+      await searchInput.fill('a');
+      await page.locator('button[title="buscar"]').click();
+      await page.waitForLoadState('networkidle', { timeout: timeouts.default }).catch(() => {});
+      const shotBusqueda = await shot('plataforma-geografia-personal-busqueda');
+      await log('Buscar personal por texto', 'ok', null, shotBusqueda);
+    }
+
     await page.getByRole('link', { name: 'Regresar' }).click();
   },
 };

@@ -67,12 +67,12 @@ module.exports = {
       await log('Seleccionar sucursal y caja', 'ok', null, shotCaja);
     }
 
-    // Puede haber quedado un producto de una corrida anterior en el carrito (persiste en la
+    // Puede haber quedado un producto de un flujo anterior en el carrito (persiste en la
     // sesion del backend, no se limpia solo); se borra para partir de un estado limpio.
     const borrarTodo = page.getByRole('button', { name: 'Borrar todo', exact: true });
     if (await borrarTodo.isVisible({ timeout: 3000 }).catch(() => false)) {
       await borrarTodo.click();
-      await log('Limpiar carrito con productos de una corrida anterior', 'ok');
+      await log('Limpiar carrito con productos de un flujo anterior', 'ok');
     }
 
     // La calculadora a veces inicia colapsada (icono para expandir) y a veces ya viene

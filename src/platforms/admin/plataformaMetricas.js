@@ -11,9 +11,10 @@ module.exports = {
     await enterPlataformaModule(page, 'Métricas', timeouts.default);
     await assertAppNotCrashed(page);
 
-    // Solo se valida la vista por defecto "Avance general" (filtros + tabla, de solo
-    // lectura). Nunca se hace clic en "Permisos" (CRUD de colaboradores) ni "Formularios"
-    // (crear/editar cuestionarios): ambos son entradas a flujos que escriben en el backend.
+    // Solo se valida la vista por defecto "Avance general" (tarjetas de solo lectura, sin
+    // ningun filtro/input en el DOM segun el codigo fuente de ViewMetricasAside). Nunca se
+    // hace clic en "Permisos" (CRUD de colaboradores) ni "Formularios" (crear/editar
+    // cuestionarios): ambos son entradas a flujos que escriben en el backend.
     const dashboard = page.locator('[data-testid="test-dashboard-body"]');
     await dashboard.waitFor({ state: 'visible', timeout: timeouts.default });
     await page.waitForLoadState('networkidle', { timeout: timeouts.default }).catch(() => {});

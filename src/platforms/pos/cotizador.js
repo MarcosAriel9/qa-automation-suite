@@ -83,7 +83,29 @@ module.exports = {
     await loadingDialog.waitFor({ state: 'visible', timeout: 8000 }).catch(() => {});
     await loadingDialog.waitFor({ state: 'hidden', timeout: timeouts.cotizacionWait });
 
-    await waitForAnyText(page, ['Pago en la app', 'Mejor oferta'], 15000);
+    // Tras desaparecer el loader, si el backend no pudo generar una oferta (estatus terminal
+    // "sin oferta"), la app muestra una alerta SweetAlert2 en vez de la tabla de ofertas; se
+    // distingue ese caso real de un simple timeout corto (15s era muy poco margen).
+    const popup = page.locator('.swal2-popup');
+    const raceResult = await Promise.race([
+      popup
+        .waitFor({ state: 'visible', timeout: timeouts.default })
+        .then(() => 'popup')
+        .catch(() => 'timeout'),
+      waitForAnyText(page, ['Pago en la app', 'Mejor oferta'], timeouts.default)
+        .then(() => 'oferta')
+        .catch(() => 'timeout'),
+    ]);
+
+    if (raceResult === 'popup') {
+      const title = (await page.locator('.swal2-title').innerText().catch(() => '')) || 'alerta sin título';
+      const message = await page.locator('.swal2-html-container').innerText().catch(() => '');
+      throw new Error(`El backend no generó una oferta: "${title}" ${message}`.trim());
+    }
+    if (raceResult === 'timeout') {
+      throw new Error('No aparecieron ni la oferta ni una alerta de error tras generar la cotización');
+    }
+
     const shotOferta = await shot('cotizador-oferta-generada');
     await log('Cotización generada', 'ok', null, shotOferta);
   },

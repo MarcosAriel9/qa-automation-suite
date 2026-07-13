@@ -113,7 +113,7 @@ form.addEventListener('submit', async (e) => {
   currentRunId = null;
   cancelButton.classList.remove('hidden');
   cancelButton.disabled = false;
-  cancelButton.textContent = 'Cancelar corrida';
+  cancelButton.textContent = 'Cancelar flujo';
   progressSection.classList.remove('hidden');
   progressLog.innerHTML = '';
   runResult.innerHTML = '';
@@ -155,13 +155,13 @@ cancelButton.addEventListener('click', async () => {
   if (!currentRunId) return;
   cancelButton.disabled = true;
   cancelButton.textContent = 'Cancelando…';
-  addLogEntry('Solicitando cancelar la corrida…', 'info');
+  addLogEntry('Solicitando cancelar el flujo…', 'info');
   try {
     await fetch(`/api/run/${currentRunId}/cancel`, { method: 'POST' });
   } catch (err) {
     addLogEntry(`No se pudo cancelar: ${err.message}`, 'failed');
     cancelButton.disabled = false;
-    cancelButton.textContent = 'Cancelar corrida';
+    cancelButton.textContent = 'Cancelar flujo';
   }
 });
 
@@ -226,7 +226,7 @@ async function loadHistory() {
     const runs = await res.json();
 
     if (runs.length === 0) {
-      historyList.innerHTML = '<p class="history-empty">Todavía no hay corridas registradas.</p>';
+      historyList.innerHTML = '<p class="history-empty">Todavía no hay flujos registrados.</p>';
       return;
     }
 

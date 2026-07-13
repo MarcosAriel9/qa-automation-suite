@@ -3,10 +3,10 @@ const { assertAppNotCrashed } = require('../../utils/playwrightHelpers');
 module.exports = {
   id: 'originacion',
   label: 'Originación',
-  requiredEnvKey: null,
+  requiredEnvKey: 'pos.originacion',
   dependsOn: ['login', 'dashboard'],
   async run(ctx) {
-    const { page, shot, log, timeouts } = ctx;
+    const { page, cfg, shot, log, timeouts } = ctx;
 
     await page.locator('[data-testid="link-test-Originacion"]').click();
     try {
@@ -16,6 +16,19 @@ module.exports = {
       throw err;
     }
     await assertAppNotCrashed(page);
+
+    // El selector de Sucursal/Caja solo aparece si la sesion no tiene ya una caja asociada
+    // (mismo comportamiento que en Venta).
+    const sucursalDropdown = page.getByText('Selección de sucursal', { exact: false });
+    if (await sucursalDropdown.isVisible({ timeout: 5000 }).catch(() => false)) {
+      await sucursalDropdown.click();
+      await page.getByText(cfg.sucursal, { exact: false }).click();
+      await page.getByText('Selección de caja', { exact: false }).click();
+      await page.getByText(cfg.caja, { exact: false }).click();
+      await page.getByRole('button', { name: /Aceptar/i }).click();
+      const shotCaja = await shot('originacion-sucursal-caja-seleccionada');
+      await log('Seleccionar sucursal y caja', 'ok', null, shotCaja);
+    }
 
     // "Nueva solicitud" siempre esta presente (tab por defecto); se espera a que el TabView
     // realmente monte antes de decidir si el tab "Estatus de solicitudes" existe (depende de

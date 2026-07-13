@@ -2,7 +2,7 @@ const fs = require('fs');
 const path = require('path');
 
 /**
- * Crea una funcion de captura de pantalla ligada a una carpeta de corrida.
+ * Crea una funcion de captura de pantalla ligada a una carpeta de flujo.
  * Cada llamada numera el archivo en orden (01-, 02-, ...) para que el reporte
  * quede ordenado cronologicamente sin depender del reloj.
  */
@@ -107,49 +107,99 @@ async function waitForModuleContentReady(page, timeout) {
 }
 
 /**
- * Recarga forzando bypass de cache (equivalente a Ctrl+Shift+R), via CDP. Una recarga normal
- * (page.reload()) puede seguir sirviendo un chunk de Module Federation obsoleto desde la
- * cache del navegador; forzar el bypass de cache es lo que realmente ayuda cuando el login
- * no carga a la primera.
+ * Limpia localStorage/sessionStorage/cookies de la pagina actual. Uso deliberadamente NO
+ * automatico en los reintentos: borra tambien el token de sesion real si ya habia uno, asi
+ * que solo debe llamarse explicitamente cuando de verdad se quiere partir de cero (ej. antes
+ * del primer intento de login de una corrida), nunca como parte de un reintento generico.
+ */
+async function clearBrowserState(page) {
+  await page
+    .evaluate(() => {
+      try {
+        localStorage.clear();
+      } catch {
+        /* algunos origenes (about:blank, etc.) no permiten storage */
+      }
+      try {
+        sessionStorage.clear();
+      } catch {
+        /* idem */
+      }
+    })
+    .catch(() => {});
+  await page.context().clearCookies().catch(() => {});
+}
+
+/**
+ * Recarga la pagina para reintentar el login (equivalente a F5, no a Ctrl+Shift+R). Se probaron
+ * dos variantes mas agresivas y ambas dejaron la pantalla en blanco: bypass de cache via CDP
+ * (`Page.reload({ ignoreCache: true })`) y limpiar localStorage/cookies antes de recargar — esto
+ * ultimo ademas borraba la sesion real cuando ya habia una activa, forzando un logout no deseado
+ * cada vez que se ayudaba a recargar. Un reload simple, sin tocar cache ni storage, es lo unico
+ * que no rompe el runtime de Module Federation de esta app.
  */
 async function hardReload(page) {
-  const client = await page.context().newCDPSession(page);
-  try {
-    await client.send('Page.reload', { ignoreCache: true });
-    await page.waitForLoadState('domcontentloaded').catch(() => {});
-  } finally {
-    await client.detach().catch(() => {});
-  }
+  await page.reload({ waitUntil: 'domcontentloaded' });
 }
 
 /**
  * El primer render del login puede tardar (el shell carga el remoteEntry.js de la MFE de
  * autenticacion via Module Federation) o, alguna vez, quedarse mostrando solo el carrusel
- * promocional sin montar el formulario. Se reintenta con un hard reload (Ctrl+Shift+R, bypass
- * de cache) antes de fallar, en vez de una recarga normal que podria repetir el mismo chunk
- * obsoleto desde cache.
+ * promocional sin montar el formulario. Se intenta llenar los campos dos veces en la MISMA
+ * pantalla (sin recargar, por si solo fue una demora puntual) antes de escalar a un hard
+ * reload (Ctrl+Shift+R, bypass de cache) y repetir el ciclo — recargar toda la pagina es lo
+ * mas lento/costoso, asi que solo se hace si dos intentos directos ya fallaron.
+ *
+ * El campo puede quedar "visible" en el DOM (pasa el chequeo de Playwright) antes de que el
+ * framework termine de montar sus manejadores/estado controlado; si se escribe demasiado
+ * rapido, fill() no marca error pero el valor no queda realmente capturado. Por eso se espera
+ * un margen corto tras la visibilidad y, sobre todo, se VERIFICA leyendo el valor de vuelta
+ * antes de dar el intento por bueno — no basta con que fill() no haya lanzado una excepcion.
  */
-async function fillLoginForm(page, { userSelector, passwordSelector, user, password, attempts = 2, waitTimeout = 20000 }) {
+async function fillLoginForm(
+  page,
+  { userSelector, passwordSelector, user, password, pageAttempts = 2, fillAttemptsPerPage = 2, waitTimeout = 20000 }
+) {
   let lastError;
-  for (let attempt = 1; attempt <= attempts; attempt += 1) {
-    try {
-      if (attempt > 1) {
-        await hardReload(page);
-      }
-      const userField = page.locator(userSelector).first();
-      await userField.waitFor({ state: 'visible', timeout: waitTimeout });
-      await userField.fill(user);
+  const totalAttempts = pageAttempts * fillAttemptsPerPage;
+  let attemptNumber = 0;
 
-      const passwordField = page.locator(passwordSelector).first();
-      await passwordField.waitFor({ state: 'visible', timeout: waitTimeout });
-      await passwordField.fill(password);
-      return;
-    } catch (err) {
-      lastError = err;
+  for (let pageAttempt = 1; pageAttempt <= pageAttempts; pageAttempt += 1) {
+    if (pageAttempt > 1) {
+      await hardReload(page);
+    }
+
+    for (let fillAttempt = 1; fillAttempt <= fillAttemptsPerPage; fillAttempt += 1) {
+      attemptNumber += 1;
+      // Solo el ultimo intento en general espera el timeout completo; los anteriores fallan
+      // rapido para no gastar 2x el timeout completo antes de siquiera recargar la pagina.
+      const isLastOverallAttempt = attemptNumber === totalAttempts;
+      const thisWait = isLastOverallAttempt ? waitTimeout : Math.min(8000, waitTimeout);
+      try {
+        const userField = page.locator(userSelector).first();
+        await userField.waitFor({ state: 'visible', timeout: thisWait });
+        await page.waitForTimeout(400);
+        await userField.fill(user);
+
+        const passwordField = page.locator(passwordSelector).first();
+        await passwordField.waitFor({ state: 'visible', timeout: thisWait });
+        await passwordField.fill(password);
+
+        const [userValue, passwordValue] = await Promise.all([
+          userField.inputValue().catch(() => ''),
+          passwordField.inputValue().catch(() => ''),
+        ]);
+        if (userValue !== user || passwordValue !== password) {
+          throw new Error('Los campos de usuario/contraseña no retuvieron el valor capturado (se escribió demasiado rápido)');
+        }
+        return;
+      } catch (err) {
+        lastError = err;
+      }
     }
   }
   throw new Error(
-    `No se pudo capturar usuario/contraseña tras ${attempts} intento(s) (la pantalla de login no cargó a tiempo): ${lastError.message}`
+    `No se pudo capturar usuario/contraseña tras ${pageAttempts} recarga(s) de ${fillAttemptsPerPage} intento(s) cada una (la pantalla de login no cargó a tiempo): ${lastError.message}`
   );
 }
 
@@ -196,7 +246,7 @@ async function submitLoginAndWait(
     await page.waitForTimeout(1000);
     const userValue = await page.locator(userSelector).first().inputValue().catch(() => '');
     if (!userValue) {
-      await fillLoginForm(page, { userSelector, passwordSelector, user, password, attempts: 1, waitTimeout: 5000 });
+      await fillLoginForm(page, { userSelector, passwordSelector, user, password, pageAttempts: 1, waitTimeout: 5000 });
       await submitLocator.click();
     }
 
@@ -281,13 +331,18 @@ async function enterPlataformaModule(page, cardTitle, timeout) {
 
 /**
  * Los selects de MUI en los modulos de Plataforma (Productos/Precios/Compensaciones) no son
- * <select> nativos: al hacer click abren un Menu/Popover con <li role="option">. Se elige la
- * primera opcion real (la segunda de la lista, ya que la primera suele ser un placeholder
- * vacio), suficiente para forzar una consulta de solo lectura sin depender de datos
- * especificos del ambiente.
+ * <select> nativos: al hacer click abren un Menu/Popover con <li role="option">. El
+ * data-testid que los devs agregaron cae sobre el <input> nativo OCULTO (aria-hidden,
+ * solo para semantica de formulario) que MUI renderiza junto al selector real; el elemento
+ * clickeable de verdad es su hermano <div role="combobox">, que es justo el que Playwright
+ * reporta como "intercepts pointer events" si se intenta clicar el input directamente. Se
+ * sube al padre inmediato y se busca ese combobox visible antes de clicar.
  */
 async function selectFirstMuiOption(page, triggerSelector, timeout) {
-  await page.locator(triggerSelector).click();
+  const hiddenInput = page.locator(triggerSelector);
+  const visibleCombobox = hiddenInput.locator('xpath=../div[@role="combobox"]');
+  const clickTarget = (await visibleCombobox.count().catch(() => 0)) > 0 ? visibleCombobox.first() : hiddenInput;
+  await clickTarget.click();
   const options = page.locator('li[role="option"]');
   const opened = await options
     .first()
@@ -326,6 +381,7 @@ module.exports = {
   clickDigitButtons,
   ensureDir,
   hardReload,
+  clearBrowserState,
   fillLoginForm,
   submitLoginAndWait,
   waitForModuleContentReady,

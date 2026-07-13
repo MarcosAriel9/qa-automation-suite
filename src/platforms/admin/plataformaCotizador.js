@@ -16,7 +16,10 @@ module.exports = {
     // (info de la subsidiaria); se toma el primero disponible ya que no hay forma de conocer
     // de antemano nombres validos en este ambiente. NUNCA se completa "Agregar Producto"
     // (crea un producto real) ni el "Continuar" del modal de cliente (genera una cotización real).
-    const comercioDropdown = page.getByText('Seleccionar comercio', { exact: false }).first();
+    // "Seleccionar comercio" es el placeholder de un PrimeReact Dropdown, no texto renderizado
+    // siempre visible; se ubica por la clase real del componente (".p-dropdown"), que existe
+    // sin importar el placeholder/idioma.
+    const comercioDropdown = page.locator('.p-dropdown').first();
     const hasDropdown = await comercioDropdown
       .waitFor({ state: 'visible', timeout: timeouts.default })
       .then(() => true)

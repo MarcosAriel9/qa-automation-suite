@@ -8,7 +8,7 @@ app.use(express.json());
 app.use(express.static(path.join(__dirname, '..', 'public')));
 app.use('/reports', express.static(path.join(__dirname, '..', 'reports')));
 
-// Corridas activas, para poder cancelarlas desde /api/run/:runId/cancel. Cerrar el navegador
+// Flujos activos, para poder cancelarlos desde /api/run/:runId/cancel. Cerrar el navegador
 // interrumpe de inmediato cualquier espera de Playwright en curso, sin necesidad de que cada
 // front revise una bandera de cancelacion en cada paso.
 const activeRuns = new Map();
@@ -26,7 +26,7 @@ app.get('/api/runs', (req, res) => {
 
 app.post('/api/run/:runId/cancel', (req, res) => {
   const entry = activeRuns.get(req.params.runId);
-  if (!entry) return res.status(404).json({ error: 'Esa corrida no está activa (ya terminó o no existe)' });
+  if (!entry) return res.status(404).json({ error: 'Ese flujo no está activo (ya terminó o no existe)' });
   entry.cancelled = true;
   if (entry.browser) entry.browser.close().catch(() => {});
   res.json({ ok: true });

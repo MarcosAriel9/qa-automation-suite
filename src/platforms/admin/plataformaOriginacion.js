@@ -21,6 +21,29 @@ module.exports = {
     const shotFile = await shot('plataforma-originacion-cargado');
     await log('Cargar dashboard de Originación (Plataforma CDT)', 'ok', null, shotFile);
 
+    // El filtro "Socio comercial" (dropdown de PrimeReact) solo cambia los criterios de una
+    // busqueda de solicitudes ya existentes (GetSolicitudes); no hay boton de "Nueva
+    // solicitud" en este dashboard, a diferencia del modulo de Originacion en POS.
+    const socioDropdown = page.locator('[data-testid="socio-dropdown"]');
+    const hasSocio = await socioDropdown
+      .waitFor({ state: 'visible', timeout: 8000 })
+      .then(() => true)
+      .catch(() => false);
+    if (hasSocio) {
+      await socioDropdown.click();
+      const option = page.locator('.p-dropdown-item').first();
+      const opened = await option
+        .waitFor({ state: 'visible', timeout: 5000 })
+        .then(() => true)
+        .catch(() => false);
+      if (opened) {
+        await option.click();
+        await page.waitForLoadState('networkidle', { timeout: timeouts.default }).catch(() => {});
+        const shotFiltro = await shot('plataforma-originacion-filtro-socio');
+        await log('Filtrar solicitudes por Socio comercial', 'ok', null, shotFiltro);
+      }
+    }
+
     await page.getByRole('link', { name: 'Regresar' }).click();
   },
 };
