@@ -70,8 +70,18 @@ module.exports = {
     if (hasSucursalDialog) {
       await sucursalDropdown.click();
       await page.getByText(cfg.sucursal, { exact: false }).click();
+
+      // El campo de Caja depende de la Sucursal elegida (cascada): sus opciones se piden por
+      // GET recien al seleccionar la sucursal, no vienen precargadas. Sin esta espera, el
+      // dropdown de Caja se abre vacio y el click sobre cfg.caja no encuentra nada que marcar.
+      await page.waitForLoadState('networkidle', { timeout: timeouts.default }).catch(() => {});
+      await page.waitForTimeout(1000);
+
       await page.getByText('Selección de caja', { exact: false }).click();
-      await page.getByText(cfg.caja, { exact: false }).click();
+      const cajaOption = page.getByText(cfg.caja, { exact: false });
+      await cajaOption.waitFor({ state: 'visible', timeout: timeouts.default });
+      await cajaOption.click();
+
       await page.getByRole('button', { name: /Aceptar/i }).click();
       const shotCaja = await shot('venta-sucursal-caja-seleccionada');
       await log('Seleccionar sucursal y caja', 'ok', null, shotCaja);
