@@ -12,6 +12,19 @@ const historyList = document.getElementById('history-list');
 let frontsMeta = [];
 let currentRunId = null;
 
+// --- Sanitization helper to prevent DOM XSS ---
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.appendChild(document.createTextNode(String(str)));
+  return div.innerHTML;
+}
+
+// --- CSRF token helper ---
+function getCsrfToken() {
+  const match = document.cookie.match(/(?:^|;\s*)csrf_token=([^;]*)/);
+  return match ? match[1] : '';
+}
+
 function getPlatform() {
   return form.querySelector('input[name="platform"]:checked').value;
 }
@@ -70,7 +83,11 @@ async function loadFronts() {
   frontsMeta.forEach((front) => {
     const label = document.createElement('label');
     label.className = 'front-item';
-    label.innerHTML = `<input type="checkbox" value="${front.id}"> ${front.label}`;
+    const checkbox = document.createElement('input');
+    checkbox.type = 'checkbox';
+    checkbox.value = front.id;
+    label.appendChild(checkbox);
+    label.appendChild(document.createTextNode(` ${front.label}`));
     frontsList.appendChild(label);
   });
 
@@ -122,7 +139,7 @@ form.addEventListener('submit', async (e) => {
   try {
     const response = await fetch('/api/run', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() },
       body: JSON.stringify({ platform, environment, frontIds, confirmVentaProd: confirmVentaProdCheckbox.checked }),
     });
 
@@ -138,7 +155,11 @@ form.addEventListener('submit', async (e) => {
       buffer = lines.pop();
       for (const line of lines) {
         if (!line.trim()) continue;
-        handleEvent(JSON.parse(line));
+        try {
+          handleEvent(JSON.parse(line));
+        } catch (parseErr) {
+          console.warn('No se pudo parsear evento NDJSON:', parseErr.message);
+        }
       }
     }
   } catch (err) {
@@ -157,7 +178,7 @@ cancelButton.addEventListener('click', async () => {
   cancelButton.textContent = 'Cancelando…';
   addLogEntry('Solicitando cancelar el flujo…', 'info');
   try {
-    await fetch(`/api/run/${currentRunId}/cancel`, { method: 'POST' });
+    await fetch(`/api/run/${currentRunId}/cancel`, { method: 'POST', headers: { 'X-CSRF-Token': getCsrfToken() } });
   } catch (err) {
     addLogEntry(`No se pudo cancelar: ${err.message}`, 'failed');
     cancelButton.disabled = false;
@@ -187,10 +208,26 @@ function handleEvent(evt) {
       break;
     case 'run-done':
       addLogEntry(RUN_DONE_MESSAGE[evt.overallStatus] || 'Validación finalizada.', evt.overallStatus);
-      runResult.innerHTML =
-        evt.overallStatus === 'cancelled'
-          ? `<a href="${evt.reportUrl}" target="_blank">Ver reporte parcial →</a>`
-          : `<a href="${evt.reportUrl}" target="_blank">Ver reporte completo →</a> &nbsp;|&nbsp; <a href="${evt.pdfUrl}" target="_blank">Descargar PDF →</a>`;
+      runResult.innerHTML = '';
+      if (evt.overallStatus === 'cancelled') {
+        const link = document.createElement('a');
+        link.href = evt.reportUrl;
+        link.target = '_blank';
+        link.textContent = 'Ver reporte parcial →';
+        runResult.appendChild(link);
+      } else {
+        const linkReport = document.createElement('a');
+        linkReport.href = evt.reportUrl;
+        linkReport.target = '_blank';
+        linkReport.textContent = 'Ver reporte completo →';
+        runResult.appendChild(linkReport);
+        runResult.appendChild(document.createTextNode(' \u00a0|\u00a0 '));
+        const linkPdf = document.createElement('a');
+        linkPdf.href = evt.pdfUrl;
+        linkPdf.target = '_blank';
+        linkPdf.textContent = 'Descargar PDF →';
+        runResult.appendChild(linkPdf);
+      }
       break;
     case 'run-error':
       addLogEntry(`Error: ${evt.message}`, 'failed');
@@ -226,30 +263,62 @@ async function loadHistory() {
     const runs = await res.json();
 
     if (runs.length === 0) {
-      historyList.innerHTML = '<p class="history-empty">Todavía no hay flujos registrados.</p>';
+      historyList.textContent = '';
+      const p = document.createElement('p');
+      p.className = 'history-empty';
+      p.textContent = 'Todavía no hay flujos registrados.';
+      historyList.appendChild(p);
       return;
     }
 
-    historyList.innerHTML = runs
-      .map((run) => {
-        const date = new Date(run.startedAt).toLocaleString();
-        const durationSec = Math.round(run.durationMs / 1000);
-        const badgeClass = `badge-${run.overallStatus}`;
-        const badgeLabel = STATUS_BADGE_LABEL[run.overallStatus] || run.overallStatus;
-        return `
-          <div class="history-row">
-            <span class="history-badge ${badgeClass}">${badgeLabel}</span>
-            <span class="history-platform">${run.platform.toUpperCase()} · ${run.environment.toUpperCase()}</span>
-            <span class="history-date">${date} (${durationSec}s)</span>
-            <span class="history-links">
-              <a href="${run.reportUrl}" target="_blank">HTML</a>
-              <a href="${run.pdfUrl}" target="_blank">PDF</a>
-            </span>
-          </div>`;
-      })
-      .join('');
+    historyList.textContent = '';
+    runs.forEach((run) => {
+      const date = new Date(run.startedAt).toLocaleString();
+      const durationSec = Math.round(run.durationMs / 1000);
+      const badgeClass = `badge-${run.overallStatus}`;
+      const badgeLabel = STATUS_BADGE_LABEL[run.overallStatus] || run.overallStatus;
+
+      const row = document.createElement('div');
+      row.className = 'history-row';
+
+      const badge = document.createElement('span');
+      badge.className = `history-badge ${badgeClass}`;
+      badge.textContent = badgeLabel;
+
+      const platformSpan = document.createElement('span');
+      platformSpan.className = 'history-platform';
+      platformSpan.textContent = `${run.platform.toUpperCase()} · ${run.environment.toUpperCase()}`;
+
+      const dateSpan = document.createElement('span');
+      dateSpan.className = 'history-date';
+      dateSpan.textContent = `${date} (${durationSec}s)`;
+
+      const linksSpan = document.createElement('span');
+      linksSpan.className = 'history-links';
+      const htmlLink = document.createElement('a');
+      htmlLink.href = run.reportUrl;
+      htmlLink.target = '_blank';
+      htmlLink.textContent = 'HTML';
+      const pdfLink = document.createElement('a');
+      pdfLink.href = run.pdfUrl;
+      pdfLink.target = '_blank';
+      pdfLink.textContent = 'PDF';
+      linksSpan.appendChild(htmlLink);
+      linksSpan.appendChild(document.createTextNode(' '));
+      linksSpan.appendChild(pdfLink);
+
+      row.appendChild(badge);
+      row.appendChild(platformSpan);
+      row.appendChild(dateSpan);
+      row.appendChild(linksSpan);
+      historyList.appendChild(row);
+    });
   } catch (err) {
-    historyList.innerHTML = `<p class="history-empty">No se pudo cargar el historial: ${err.message}</p>`;
+    historyList.textContent = '';
+    const p = document.createElement('p');
+    p.className = 'history-empty';
+    p.textContent = `No se pudo cargar el historial: ${err.message}`;
+    historyList.appendChild(p);
   }
 }
 

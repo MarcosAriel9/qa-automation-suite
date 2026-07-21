@@ -263,8 +263,8 @@ async function runValidation(
       let errorShot = null;
       try {
         errorShot = await shot(page, `${front.id}-error`);
-      } catch {
-        /* la pagina pudo haber quedado en un estado no capturable, se ignora */
+      } catch (shotErr) {
+        console.warn(`No se pudo capturar screenshot de error para ${front.id}: ${shotErr.message}`);
       }
       steps.push({
         front: front.label,
@@ -299,8 +299,8 @@ async function runValidation(
 
   try {
     await browser.close();
-  } catch {
-    /* puede que ya se haya cerrado externamente (cancelacion) */
+  } catch (closeErr) {
+    console.warn(`No se pudo cerrar el navegador (puede que ya se haya cerrado por cancelación): ${closeErr.message}`);
   }
 
   if (wasCancelled) overallStatus = 'cancelled';
@@ -344,7 +344,8 @@ function listRuns() {
       if (!fs.existsSync(metaPath)) return null;
       try {
         return JSON.parse(fs.readFileSync(metaPath, 'utf8'));
-      } catch {
+      } catch (readErr) {
+        console.warn(`No se pudo leer/parsear meta.json de ${entry.name}: ${readErr.message}`);
         return null;
       }
     })

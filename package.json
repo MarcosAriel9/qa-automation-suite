@@ -2,6 +2,7 @@
   "name": "qa-automation-suite",
   "version": "1.0.0",
   "private": true,
+  "license": "UNLICENSED",
   "description": "Validacion funcional automatizada post-despliegue para POS y Admin",
   "main": "src/server.js",
   "scripts": {

@@ -117,17 +117,17 @@ async function clearBrowserState(page) {
     .evaluate(() => {
       try {
         localStorage.clear();
-      } catch {
-        /* algunos origenes (about:blank, etc.) no permiten storage */
+      } catch (e) {
+        console.warn('No se pudo limpiar localStorage:', e.message);
       }
       try {
         sessionStorage.clear();
-      } catch {
-        /* idem */
+      } catch (e) {
+        console.warn('No se pudo limpiar sessionStorage:', e.message);
       }
     })
-    .catch(() => {});
-  await page.context().clearCookies().catch(() => {});
+    .catch((err) => { console.warn('clearBrowserState evaluate failed:', err.message); });
+  await page.context().clearCookies().catch((err) => { console.warn('clearCookies failed:', err.message); });
 }
 
 /**
@@ -269,7 +269,8 @@ async function raceForVisible(locatorsByKey, timeout) {
   const keys = Object.keys(locatorsByKey);
   try {
     return await Promise.any(keys.map((key) => locatorsByKey[key].waitFor({ state: 'visible', timeout }).then(() => key)));
-  } catch {
+  } catch (err) {
+    console.warn(`raceForVisible: ningún locator visible en ${timeout}ms (${err.message})`);
     return 'timeout';
   }
 }
